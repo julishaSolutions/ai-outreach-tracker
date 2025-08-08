@@ -483,14 +483,10 @@
 
         // --- AI & API CALLS ---
         async function callGemini(prompt) {
-            const apiKey = ""; // Leave empty
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            // The API URL now points to our own serverless function proxy
+            const apiUrl = `/.netlify/functions/gemini-proxy`;
             
-            const payload = {
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
-            };
+            const payload = { prompt }; // Send the prompt in the request body
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -499,14 +495,23 @@
             });
 
             if (!response.ok) {
-                throw new Error(`API call failed with status: ${response.status}`);
+                const errorBody = await response.text();
+                console.error("Proxy function error response:", errorBody);
+                throw new Error(`Proxy function call failed with status: ${response.status}`);
             }
 
             const result = await response.json();
+            
+            // Handle potential errors returned from the proxy function itself
+            if (result.error) {
+                 throw new Error(`Error from proxy function: ${result.error}`);
+            }
+
             if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
                 return result.candidates[0].content.parts[0].text;
             } else {
-                throw new Error("Invalid response structure from API");
+                console.error("Invalid response structure from proxy:", result);
+                throw new Error("Invalid response structure from proxy");
             }
         }
 
