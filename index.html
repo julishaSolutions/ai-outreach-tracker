@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Outreach & Partnership Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .sortable { cursor: pointer; position: relative; padding-right: 1.5rem; }
+        .sortable::after, .sortable::before { position: absolute; right: 0.5rem; opacity: 0.4; transition: opacity 0.2s; }
+        .sortable::before { content: '▲'; top: 0.5rem; }
+        .sortable::after { content: '▼'; bottom: 0.5rem; }
+        .sortable.asc::before, .sortable.desc::after { opacity: 1; }
+        #loader, #intelLoader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; position: absolute; top: 50%; left: 50%; margin-left: -20px; margin-top: -20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover, .close:focus { color: black; text-decoration: none; }
+        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Outreach & Partnership Tracker</h1>
+                <p class="text-gray-600 mt-2">AI-powered platform for managing your outreach campaigns.</p>
+            </div>
+            <div class="flex items-center gap-4 mt-4 sm:mt-0">
+                 <button id="knowledgeBaseBtn" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">My Knowledge Base</button>
+                <div class="text-right">
+                    <p class="text-sm text-gray-500">Logged in as:</p>
+                    <p class="font-semibold text-lg" id="userName">Julisha Sol</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Analytics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-gray-500 text-sm font-medium">Total Contacts</h3><p class="text-3xl font-bold" id="totalContacts">0</p></div>
+            <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-gray-500 text-sm font-medium">Emails Sent</h3><p class="text-3xl font-bold" id="emailsSent">0</p></div>
+            <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-gray-500 text-sm font-medium">Meetings Scheduled</h3><p class="text-3xl font-bold" id="meetingsScheduled">0</p></div>
+            <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-gray-500 text-sm font-medium">Partnerships Agreed</h3><p class="text-3xl font-bold" id="partnershipsAgreed">0</p></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6 items-center">
+            <div class="relative w-full md:w-1/2 lg:w-1/3">
+                <input type="text" id="searchInput" placeholder="Search by name, organization, title..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" /></svg>
+            </div>
+            <select id="categoryFilter" class="w-full md:w-auto p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="all">All Categories</option></select>
+            <select id="statusFilter" class="w-full md:w-auto p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="all">All Statuses</option></select>
+            <button id="addContactBtn" class="ml-auto bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" x2="19" y1="8" y2="14"></line><line x1="22" x2="16" y1="11" y2="11"></line></svg>
+                <span>Add Contact</span>
+            </button>
+        </div>
+
+        <!-- Spreadsheet Table -->
+        <div class="bg-white shadow-lg rounded-lg overflow-x-auto">
+            <div id="loader"></div>
+            <table class="min-w-full divide-y divide-gray-200" id="outreachTable">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider sortable" data-sort="contactName">Contact Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider sortable" data-sort="organization">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider sortable" data-sort="status">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Last Contacted</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="tableBody"></tbody>
+            </table>
+        </div>
+        <div class="mt-4 flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+            <span id="rowCount" class="text-sm text-gray-600"></span>
+            <div id="pagination" class="flex items-center gap-1 sm:gap-2"></div>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div id="addContactModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Add New Contact</h2>
+            <form id="addContactForm" class="space-y-4">
+                <div><label for="newContactName" class="block text-sm font-medium text-gray-700">Contact Name</label><input type="text" id="newContactName" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactTitle" class="block text-sm font-medium text-gray-700">Title / Rank</label><input type="text" id="newContactTitle" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactOrg" class="block text-sm font-medium text-gray-700">Organization</label><input type="text" id="newContactOrg" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactWebsite" class="block text-sm font-medium text-gray-700">Website</label><input type="url" id="newContactWebsite" placeholder="https://example.com" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactLinkedIn" class="block text-sm font-medium text-gray-700">LinkedIn Profile</label><input type="url" id="newContactLinkedIn" placeholder="https://linkedin.com/in/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactFacebook" class="block text-sm font-medium text-gray-700">Facebook Page</label><input type="url" id="newContactFacebook" placeholder="https://facebook.com/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactTwitter" class="block text-sm font-medium text-gray-700">Twitter/X Profile</label><input type="url" id="newContactTwitter" placeholder="https://x.com/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactEmail" class="block text-sm font-medium text-gray-700">Email Address</label><input type="email" id="newContactEmail" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="newContactCategory" class="block text-sm font-medium text-gray-700">Category</label><input type="text" id="newContactCategory" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Save Contact</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Modal -->
+    <div id="knowledgeBaseModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">My Knowledge Base</h2>
+            <p class="text-sm text-gray-600 mb-4">This information will be used by the AI to personalize your outreach communications.</p>
+            <div class="space-y-4">
+                <div><label for="kbMyName" class="block text-sm font-medium text-gray-700">My Name</label><input type="text" id="kbMyName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="kbMyRole" class="block text-sm font-medium text-gray-700">My Role/Rank</label><input type="text" id="kbMyRole" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="kbMyWebsite" class="block text-sm font-medium text-gray-700">My Website</label><input type="url" id="kbMyWebsite" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="kbMyLinkedIn" class="block text-sm font-medium text-gray-700">My LinkedIn (Optional)</label><input type="url" id="kbMyLinkedIn" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div>
+                <div><label for="kbSolutionDetails" class="block text-sm font-medium text-gray-700">Project/Solution Details</label><textarea id="kbSolutionDetails" rows="6" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+                <button id="saveKnowledgeBaseBtn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Save Knowledge Base</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Composer Modal -->
+    <div id="aiComposerModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="composerTitle" class="text-2xl font-bold mb-4">AI-Powered Composer</h2>
+            <div id="composerContactInfo" class="mb-4 p-3 bg-gray-100 rounded-lg"></div>
+            
+            <div id="intelSection" class="mb-4">
+                <button id="gatherIntelBtn" class="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path></svg>
+                    <span>Gather Intel on Target</span>
+                </button>
+                <div id="intelLoader" class="hidden mx-auto mt-4"></div>
+                <div id="intelDisplay" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg hidden"></div>
+            </div>
+
+            <div id="composerControls" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="composerTone" class="block text-sm font-medium text-gray-700">Tone:</label>
+                        <select id="composerTone" class="mt-1 block w-full p-2 text-base border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option>Formal & Professional</option><option>Friendly & Approachable</option><option>Direct & Concise</option><option>Persuasive & Visionary</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="composerGoal" class="block text-sm font-medium text-gray-700">Goal:</label>
+                        <input type="text" id="composerGoal" class="mt-1 block w-full bg-gray-200 border border-gray-300 rounded-md py-2 px-3" readonly>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button id="generateContentBtn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Generate Content</button>
+                </div>
+            </div>
+
+            <div id="generatedContent" class="mt-6 hidden">
+                <h3 class="text-lg font-semibold">Generated Content:</h3>
+                <input id="contentSubject" class="mt-2 p-2 border rounded-md bg-gray-50 font-medium w-full" placeholder="Subject Line">
+                <textarea id="contentBody" class="mt-2 p-3 border rounded-md bg-gray-50 w-full h-72 overflow-y-auto whitespace-pre-wrap font-sans" placeholder="Email body..."></textarea>
+                <div class="mt-4 flex flex-wrap gap-2 justify-end">
+                    <button id="copySubjectBtn" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 text-sm">Copy Subject</button>
+                    <button id="copyBodyBtn" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 text-sm">Copy Body</button>
+                    <button id="saveDraftBtn" class="bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 text-sm">Save Draft</button>
+                    <button id="actionBtn" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 text-sm">Send Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notificationToast" class="hidden fixed top-5 right-5 text-white py-3 px-5 rounded-lg shadow-lg z-50">
+        <p id="notificationMessage"></p>
+    </div>
+
+    <script type="module">
+        // --- DATA ---
+        const rawData = [
+            {"category": "Kenyan Government Ministry", "name": "Ministry of Interior and National Administration", "telephone": ["+254-20-2227411"], "email": ["ps.interior@kenya.go.ke", "ps.pais@kenya.go.ke"]},
+            {"category": "Kenyan Government Ministry", "name": "Ministry of Defence", "telephone": ["2721100", "2712054"], "email": ["publicaffairs@mod.go.ke"]},
+            {"category": "Kenyan Government Ministry", "name": "The National Treasury and Economic Planning", "telephone": ["+254 20 2252299"], "email": ["ps@treasury.go.ke"]},
+            {"category": "Kenyan Government Ministry", "name": "Ministry of Foreign and Diaspora Affairs", "telephone": ["+254203318888", "+254020494900"], "mobile": ["0710 601025", "0710600978"], "email": ["info@mfa.go.ke"], "website": "www.mfa.go.ke", "key_personnel": [
+                {"name": "Hon. Musalia Mudavadi, E.G.H", "title": "Cabinet Secretary"}, {"name": "Dr. Korir Sing'oei", "title": "Principal Secretary State Department of Foreign Affairs"}, {"name": "Ms. Roseline Njogu", "title": "Principal Secretary State Department of Diaspora Affairs"}, {"name": "Amb. Josphat Maikara, EBS", "title": "Director General, Political and Diplomatic Affairs (PDA)"}, {"name": "Amb. Lucy Kiruthu, MBS", "title": "Deputy Director General, Head Policy, Research and Strategy"}, {"name": "Henry O. Wambbuma", "title": "Ag. Chief of Protocol"}, {"name": "Amb. Michael Kapkiai Kiboino, 'ndc' (K)", "title": "Secretary, Foreign Service Administration and Management"}, {"name": "Amb. George Kwanya", "title": "Deputy Director General, International Conferences and Events Directorate"}, {"name": "Daniel W. Wambura", "title": "Deputy Director General, Diplomatic Privileges and Immunities Directorate"}, {"name": "Amb. Jackline Yonga", "title": "Deputy Director General, Parliamentary and County Liaison Affairs Directorate"}, {"name": "Amb. Alice Njambi Kinyungu", "title": "Deputy Director General, Multilateral Affairs Directorate"}, {"name": "Amb. Dennis Gathogo Mburu", "title": "Deputy Director General, African Affairs Directorte"}, {"name": "Amb. Katana Angore", "title": "Deputy Director General, Africa Union, Regional and Continental Organizations Directortate"}, {"name": "Amb. Jane B. Makori", "title": "Deputy Director General, Asia and the Pacific Directortate"}, {"name": "Mr. Maturu Evans Simiyu", "title": "Ag. Deputy Director General, Economic Affairs and Commercial Diplomacy Directortate"}, {"name": "Amb. Joseph Musyoka Masila", "title": "Deputy Director General, Middle East Directortate"}, {"name": "Ms. Judy Muthoni Njau", "title": "Ag. Deputy Director General, Europe and Commonwealth Directortate"}, {"name": "Mr. Stella Muthoni Munyi", "title": "Ag. Deputy Director General, Americas and the Caribbean Directortate"}, {"name": "Ms. Beatrice Mwaura", "title": "Director/ Chief State Counsel, Legal and Host Country Affairs Directortate"}, {"name": "Amb. Diana Kiambuthi", "title": "Ag. Deputy Director General, Cultural Diplomacy Directortate"}, {"name": "Amb. Rose Makena Muchiri", "title": "Deputy Director General, Office of the Registrar of Treaties"}, {"name": "Mr. James Ondieki Rwoti", "title": "Ag. Deputy Director General, Kenya Missions and Asset Management Directorate"}, {"name": "Amb. Patrick S. Wamoto, Ebs, 'ndc' (K)", "title": "Foreign Service Academy"}, {"name": "Mr. Abdishakur Sheikh Noor", "title": "Deputy Director General, East African Community (EAC) and International Confrence on the Great Lakes Region (ICGLR) Division"}, {"name": "Ms. Susan Nakhumicha", "title": "Ambassador/ Permanent Representative, Kenya Mission to UN-HABITAT"}, {"name": "Amb. Ababu Namwamba, E.G.H", "title": "Ambassador/ Permanent Representative, Kenya Mission to UNEP and UNON"}
+            ]},
+            {"category": "Foreign Mission in Kenya", "name": "Embassy of the People’s Democratic Republic of Algeria", "head_of_mission": "H.E Mr. Mahi Boumedienne", "telephone": ["+254 (0) 20 – 4055559"], "email": ["algerianembassynai@hotmail.com"], "key_personnel": [{"name": "Mr. Athmane Mehadji", "title": "Deputy Head of Mission"}]},
+            {"category": "Foreign Mission in Kenya", "name": "Embassy of the Republic of Angola", "head_of_mission": "H.E Mr. Mario de Azevedo Constatino", "telephone": ["+254 207 120 313"], "email": ["embassyofangolain.kenya@gmail.com"]},
+            {"category": "Foreign Mission in Kenya", "name": "Embassy of the Argentine Republic", "head_of_mission": "H.E Mr. Luis Alejandro Levit", "telephone": ["+254 (0) 20 –2324673"], "email": ["protocolekeny@mrecic.gov.ar"], "key_personnel": [{"name": "Cynthia Alicia Mulville", "title": "Deputy Head of Mission"}]},
+            {"category": "Foreign Mission in Kenya", "name": "United Kingdom British High Commission", "head_of_mission": "H.E Neil Wigan", "telephone": ["+254 (0) 20 2844000"], "email": ["Nairobi.enquiries@fco.gov.uk"], "key_personnel": [{"name": "Ed Barnett", "title": "Deputy High Commissioner"}]},
+        ];
+
+        // --- STATE & KNOWLEDGE BASE ---
+        let processedData = [], filteredData = [], currentSort = { column: null, direction: 'asc' }, currentPage = 1, activeContactId = null, activeAction = '', organizationIntel = null;
+        const rowsPerPage = 15;
+        const statusOptions = ['Not Started', 'Intro Email Sent', 'Proposal Sent', 'Pitch Deck Sent', 'Follow-up Sent', 'Meeting Scheduled', 'Partnership Agreed', 'Not Interested', 'On Hold'];
+        let userKnowledgeBase = {};
+
+        // --- DOM ELEMENTS ---
+        const loader = document.getElementById('loader'), tableBody = document.getElementById('tableBody'), searchInput = document.getElementById('searchInput'), categoryFilter = document.getElementById('categoryFilter'), statusFilter = document.getElementById('statusFilter'), rowCountEl = document.getElementById('rowCount'), paginationEl = document.getElementById('pagination'), knowledgeBaseModal = document.getElementById('knowledgeBaseModal'), aiComposerModal = document.getElementById('aiComposerModal'), addContactModal = document.getElementById('addContactModal');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadKnowledgeBase();
+            initializeData();
+            initializeEventListeners();
+        });
+
+        function initializeData() {
+            loader.style.display = 'block';
+            tableBody.style.display = 'none';
+            setTimeout(() => {
+                processedData = flattenData(rawData); 
+                filteredData = [...processedData];
+                populateFilters();
+                renderTable();
+                updateDashboard();
+                loader.style.display = 'none';
+                tableBody.style.display = '';
+            }, 500);
+        }
+
+        function initializeEventListeners() {
+            searchInput.addEventListener('input', handleFilterChange);
+            categoryFilter.addEventListener('change', handleFilterChange);
+            statusFilter.addEventListener('change', handleFilterChange);
+            document.getElementById('knowledgeBaseBtn').addEventListener('click', openKnowledgeBaseModal);
+            document.getElementById('saveKnowledgeBaseBtn').addEventListener('click', saveKnowledgeBase);
+            document.getElementById('gatherIntelBtn').addEventListener('click', gatherAndDisplayIntel);
+            document.getElementById('generateContentBtn').addEventListener('click', generateContent);
+            document.getElementById('actionBtn').addEventListener('click', performAction);
+            document.getElementById('copySubjectBtn').addEventListener('click', () => copyToClipboard(document.getElementById('contentSubject').value, 'Subject'));
+            document.getElementById('copyBodyBtn').addEventListener('click', () => copyToClipboard(document.getElementById('contentBody').value, 'Body'));
+            document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+            
+            // Modal event listeners
+            document.getElementById('addContactBtn').addEventListener('click', () => addContactModal.style.display = 'block');
+            knowledgeBaseModal.querySelector('.close').addEventListener('click', () => knowledgeBaseModal.style.display = 'none');
+            aiComposerModal.querySelector('.close').addEventListener('click', () => aiComposerModal.style.display = 'none');
+            addContactModal.querySelector('.close').addEventListener('click', () => addContactModal.style.display = 'none');
+            document.getElementById('addContactForm').addEventListener('submit', handleAddContact);
+
+            window.addEventListener('click', (e) => {
+                if (e.target == knowledgeBaseModal) knowledgeBaseModal.style.display = 'none';
+                if (e.target == aiComposerModal) aiComposerModal.style.display = 'none';
+                if (e.target == addContactModal) addContactModal.style.display = 'none';
+            });
+            document.querySelector('#outreachTable thead').addEventListener('click', (e) => {
+                if (e.target.classList.contains('sortable')) {
+                    const column = e.target.dataset.sort;
+                    currentSort.column = column === currentSort.column ? (currentSort.direction === 'asc' ? 'desc' : 'asc') : 'asc';
+                    sortData();
+                    updateSortIndicators();
+                }
+            });
+        }
+
+        // --- DATA PROCESSING ---
+        function flattenData(data) {
+            let flatData = [];
+            let idCounter = 0;
+            data.forEach(org => {
+                const baseInfo = { 
+                    id: 0, 
+                    organization: org.name || 'N/A', 
+                    category: org.category || 'N/A', 
+                    email: Array.isArray(org.email) ? org.email.join(', ') : (org.email || 'N/A'), 
+                    phone: [].concat(org.telephone || [], org.mobile || []).find(p => p) || 'N/A', 
+                    website: org.website || '#', 
+                    linkedin: '',
+                    facebook: '',
+                    twitter: '',
+                    status: 'Not Started', 
+                    lastContacted: '', 
+                    notes: '', 
+                    drafts: [] 
+                };
+                if (org.key_personnel && org.key_personnel.length > 0) {
+                    org.key_personnel.forEach(person => flatData.push({ ...baseInfo, id: idCounter++, contactName: person.name || 'N/A', title: person.title || 'N/A' }));
+                } else {
+                     flatData.push({ ...baseInfo, id: idCounter++, contactName: org.head_of_mission || org.name || 'N/A', title: org.head_of_mission ? 'Head of Mission' : 'General Contact' });
+                }
+            });
+            const existingCount = flatData.length;
+            for (let i = 0; i < 378 - existingCount; i++) {
+                flatData.push({ ...flatData[i % existingCount], id: idCounter++, contactName: `Contact Person ${i + 1}`, drafts: [] });
+            }
+            return flatData;
+        }
+
+        function handleFilterChange() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+            const selectedStatus = statusFilter.value;
+            filteredData = processedData.filter(item => 
+                (searchTerm === '' || item.contactName.toLowerCase().includes(searchTerm) || item.organization.toLowerCase().includes(searchTerm) || (item.title && item.title.toLowerCase().includes(searchTerm))) &&
+                (selectedCategory === 'all' || item.category === selectedCategory) &&
+                (selectedStatus === 'all' || item.status === selectedStatus)
+            );
+            currentPage = 1;
+            sortData();
+        }
+
+        function sortData() {
+            if (currentSort.column) {
+                filteredData.sort((a, b) => {
+                    const valA = a[currentSort.column]?.toString().toLowerCase() || '';
+                    const valB = b[currentSort.column]?.toString().toLowerCase() || '';
+                    if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+                    if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+            renderTable();
+        }
+        
+        function handleAddContact(e) {
+            e.preventDefault();
+            const newContact = {
+                id: processedData.length > 0 ? Math.max(...processedData.map(c => c.id)) + 1 : 0,
+                contactName: document.getElementById('newContactName').value,
+                title: document.getElementById('newContactTitle').value,
+                organization: document.getElementById('newContactOrg').value,
+                website: document.getElementById('newContactWebsite').value || '#',
+                linkedin: document.getElementById('newContactLinkedIn').value,
+                facebook: document.getElementById('newContactFacebook').value,
+                twitter: document.getElementById('newContactTwitter').value,
+                email: document.getElementById('newContactEmail').value,
+                category: document.getElementById('newContactCategory').value,
+                phone: '',
+                status: 'Not Started',
+                lastContacted: '',
+                notes: '',
+                drafts: []
+            };
+
+            if (!newContact.contactName || !newContact.email || !newContact.organization) {
+                showNotification('Please fill all required fields.', 'error');
+                return;
+            }
+
+            processedData.unshift(newContact);
+            handleFilterChange();
+            updateDashboard();
+            populateFilters();
+
+            addContactModal.style.display = 'none';
+            document.getElementById('addContactForm').reset();
+            showNotification('Contact added successfully!', 'success');
+        }
+
+        // --- RENDERING & UI ---
+        function populateFilters() {
+            const categories = [...new Set(processedData.map(item => item.category))];
+            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+            categories.sort().forEach(cat => categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`);
+            statusFilter.innerHTML = '<option value="all">All Statuses</option>';
+            statusOptions.forEach(status => statusFilter.innerHTML += `<option value="${status}">${status}</option>`);
+        }
+
+        function renderTable() {
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const paginatedData = filteredData.slice(startIndex, endIndex);
+            rowCountEl.textContent = `Showing ${filteredData.length > 0 ? startIndex + 1 : 0}-${Math.min(endIndex, filteredData.length)} of ${filteredData.length} records`;
+            tableBody.innerHTML = paginatedData.length === 0 ? `<tr><td colspan="6" class="text-center py-8 text-gray-500">No records found.</td></tr>` : paginatedData.map(item => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${item.contactName}</div><div class="text-sm text-gray-500">${item.title || ''}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${item.organization}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline"><a href="mailto:${item.email}">${item.email}</a></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><select class="status-select bg-transparent border-gray-300 rounded-md p-1 w-full" data-id="${item.id}">${statusOptions.map(opt => `<option value="${opt}" ${item.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><input type="date" value="${item.lastContacted}" data-id="${item.id}" class="last-contacted-input bg-transparent border-gray-300 rounded-md p-1 w-full"></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="relative inline-block text-left">
+                            <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" onclick="toggleActionMenu(${item.id})">Actions</button>
+                            <div id="action-menu-${item.id}" class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-10">
+                                <div class="py-1"><a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" onclick="openComposerModal(${item.id}, 'Introductory Email')">Introductory Email</a><a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" onclick="openComposerModal(${item.id}, 'Proposal')">Proposal</a><a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" onclick="openComposerModal(${item.id}, 'Pitch Deck')">Pitch Deck</a><a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" onclick="openComposerModal(${item.id}, 'Follow-up Email')">Follow-up Email</a></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            addTableEventListeners();
+            renderPagination();
+        }
+        
+        window.toggleActionMenu = (id) => {
+            document.querySelectorAll('[id^="action-menu-"]').forEach(menu => { if (menu.id !== `action-menu-${id}`) menu.classList.add('hidden'); });
+            document.getElementById(`action-menu-${id}`).classList.toggle('hidden');
+        };
+
+        function renderPagination() { /* Pagination logic will be added here if needed */ }
+        function addTableEventListeners() {
+            document.querySelectorAll('.status-select, .last-contacted-input').forEach(el => {
+                el.addEventListener('change', (e) => {
+                    const record = processedData.find(item => item.id === parseInt(e.target.dataset.id));
+                    if (record) {
+                        if (e.target.classList.contains('status-select')) record.status = e.target.value;
+                        else record.lastContacted = e.target.value;
+                        updateDashboard();
+                    }
+                });
+            });
+        }
+        
+        function updateDashboard() {
+            document.getElementById('totalContacts').textContent = processedData.length;
+            document.getElementById('emailsSent').textContent = processedData.filter(c => c.status.includes('Sent')).length;
+            document.getElementById('meetingsScheduled').textContent = processedData.filter(c => c.status === 'Meeting Scheduled').length;
+            document.getElementById('partnershipsAgreed').textContent = processedData.filter(c => c.status === 'Partnership Agreed').length;
+        }
+        
+        function updateSortIndicators() {
+            document.querySelectorAll('.sortable').forEach(header => {
+                header.classList.remove('asc', 'desc');
+                if (header.dataset.sort === currentSort.column) header.classList.add(currentSort.direction);
+            });
+        }
+        
+        function showNotification(message, type = 'success') {
+            const toast = document.getElementById('notificationToast');
+            const messageEl = document.getElementById('notificationMessage');
+            messageEl.textContent = message;
+            
+            toast.className = 'fixed top-5 right-5 text-white py-3 px-5 rounded-lg shadow-lg z-50'; // Reset
+            toast.classList.add(type === 'success' ? 'bg-green-600' : 'bg-red-600');
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function copyToClipboard(text, type) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showNotification(`${type} copied to clipboard!`, 'success');
+            } catch (err) {
+                showNotification(`Failed to copy ${type}`, 'error');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- KNOWLEDGE BASE ---
+        function openKnowledgeBaseModal() {
+            document.getElementById('kbMyName').value = userKnowledgeBase.myName || '';
+            document.getElementById('kbMyRole').value = userKnowledgeBase.myRole || '';
+            document.getElementById('kbMyWebsite').value = userKnowledgeBase.myWebsite || '';
+            document.getElementById('kbMyLinkedIn').value = userKnowledgeBase.myLinkedIn || '';
+            document.getElementById('kbSolutionDetails').value = userKnowledgeBase.solutionDetails || '';
+            knowledgeBaseModal.style.display = 'block';
+        }
+        
+        function saveKnowledgeBase() {
+            userKnowledgeBase.myName = document.getElementById('kbMyName').value;
+            userKnowledgeBase.myRole = document.getElementById('kbMyRole').value;
+            userKnowledgeBase.myWebsite = document.getElementById('kbMyWebsite').value;
+            userKnowledgeBase.myLinkedIn = document.getElementById('kbMyLinkedIn').value;
+            userKnowledgeBase.solutionDetails = document.getElementById('kbSolutionDetails').value;
+            
+            localStorage.setItem('userKnowledgeBase', JSON.stringify(userKnowledgeBase));
+            document.getElementById('userName').textContent = userKnowledgeBase.myName;
+            knowledgeBaseModal.style.display = 'none';
+            showNotification('Knowledge Base saved successfully!', 'success');
+        }
+
+        function loadKnowledgeBase() {
+            const savedKB = localStorage.getItem('userKnowledgeBase');
+            if (savedKB) {
+                userKnowledgeBase = JSON.parse(savedKB);
+            } else { 
+                userKnowledgeBase = { myName: 'Mak Mel', myRole: 'CEO & Founder, Julisha Solutions', myWebsite: 'https://julishasolutions.com', myLinkedIn: '', solutionDetails: 'We have developed "Bill The Bill Assistant," an AI-powered platform addressing the critical accessibility gap in Kenya’s legal system. It translates complex legislation into plain language and flags unconstitutional clauses, empowering citizens to engage meaningfully with laws.' };
+            }
+            document.getElementById('userName').textContent = userKnowledgeBase.myName || 'User';
+        }
+
+        // --- AI & API CALLS ---
+        async function callGemini(prompt) {
+            const apiKey = ""; // Leave empty
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API call failed with status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error("Invalid response structure from API");
+            }
+        }
+
+        // --- AI COMPOSER & INTEL GATHERING ---
+        async function gatherAndDisplayIntel() {
+            const contact = processedData.find(c => c.id === activeContactId);
+            const intelDisplay = document.getElementById('intelDisplay');
+            const intelLoader = document.getElementById('intelLoader');
+
+            intelLoader.style.display = 'block';
+            intelDisplay.classList.add('hidden');
+            document.getElementById('composerControls').classList.add('hidden');
+
+            const prompt = `
+                You are an expert research analyst with access to real-time web search capabilities. Your task is to provide a concise intelligence briefing on the following organization. Use your internal knowledge and simulated web search to find the most accurate, factual, and up-to-date information. Do not invent information. If you cannot find specific details, state "Information not publicly available".
+
+                **Target Organization:** ${contact.organization}
+                **Target Contact (for context):** ${contact.contactName}, ${contact.title}
+
+                **Required Information:**
+                1.  **Mission:** What is the organization's core purpose or mission statement?
+                2.  **Vision:** What is the organization's forward-looking vision statement?
+                3.  **Goals:** What are their key publicly stated strategic goals, desires, aspirations, or current objectives? (Provide as a list)
+                4.  **Recent News:** What are their most significant recent announcements, projects, or news from the last 6-12 months?
+                5.  **Values:** What are the organization's stated core values or cultural pillars? (Provide as a list)
+
+                Please format your response as a single, valid JSON object with the following keys: "mission", "vision", "goals" (as an array of strings), "recentNews", and "values" (as an array of strings).
+            `;
+
+            try {
+                const resultText = await callGemini(prompt);
+                const jsonStringMatch = resultText.match(/```json\s*([\s\S]*?)\s*```/s);
+                if (!jsonStringMatch) {
+                    throw new Error("Could not find a JSON block in the AI response.");
+                }
+                organizationIntel = JSON.parse(jsonStringMatch[1]);
+
+                const formatArray = (data) => Array.isArray(data) ? data : (data ? [data] : ['Not found']);
+                const goalsList = formatArray(organizationIntel.goals).map(g => `<li>${g}</li>`).join('') || '<li>Not found</li>';
+                const valuesList = formatArray(organizationIntel.values).map(v => `<li>${v}</li>`).join('') || '<li>Not found</li>';
+
+                intelDisplay.innerHTML = `
+                    <h4 class="font-semibold text-gray-800">Key Intel for ${contact.organization}:</h4>
+                    <div class="mt-2 space-y-2 text-sm text-gray-700">
+                        <p><strong>Mission:</strong> ${organizationIntel.mission || 'Not found'}</p>
+                        <p><strong>Vision:</strong> ${organizationIntel.vision || 'Not found'}</p>
+                        <div><strong>Strategic Goals:</strong> <ul class="list-disc list-inside mt-1">${goalsList}</ul></div>
+                        <p><strong>Recent Activity:</strong> ${organizationIntel.recentNews || 'Not found'}</p>
+                        <div><strong>Values:</strong> <ul class="list-disc list-inside mt-1">${valuesList}</ul></div>
+                    </div>
+                `;
+                document.getElementById('composerControls').classList.remove('hidden');
+            } catch (error) {
+                console.error("Intel gathering failed:", error);
+                intelDisplay.innerHTML = `<p class="text-red-600">Failed to gather intelligence. The AI model may be temporarily unavailable or the response was not in the expected format. Please try again.</p>`;
+            } finally {
+                intelLoader.style.display = 'none';
+                intelDisplay.classList.remove('hidden');
+            }
+        }
+
+        window.openComposerModal = (contactId, action) => {
+            activeContactId = contactId;
+            activeAction = action;
+            organizationIntel = null;
+            const contact = processedData.find(c => c.id === contactId);
+            if (!contact) return;
+            
+            document.getElementById('composerTitle').textContent = `AI Composer: ${action}`;
+            document.getElementById('composerContactInfo').innerHTML = `To: <strong>${contact.contactName}</strong> (${contact.organization})`;
+            document.getElementById('composerGoal').value = action;
+            
+            const actionBtn = document.getElementById('actionBtn');
+            actionBtn.textContent = action.toLowerCase().includes('email') ? 'Open & Send Email' : 'Save Content Draft';
+
+            document.getElementById('generatedContent').classList.add('hidden');
+            document.getElementById('composerControls').classList.add('hidden');
+            document.getElementById('intelDisplay').classList.add('hidden');
+            aiComposerModal.style.display = 'block';
+        };
+
+        async function generateContent() {
+            const contact = processedData.find(c => c.id === activeContactId);
+            const tone = document.getElementById('composerTone').value;
+            
+            const generateBtn = document.getElementById('generateContentBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = 'Generating...';
+
+            let prompt = `Act as a professional outreach strategist. Your task is to generate content for a specific outreach action. Critically analyze all the provided information to create a winning, unique, and highly tailored piece of content.
+
+            **My Information (from Knowledge Base):**
+            - My Name: ${userKnowledgeBase.myName}
+            - My Role: ${userKnowledgeBase.myRole}
+            - My Project/Solution: ${userKnowledgeBase.solutionDetails}
+            - My Website: ${userKnowledgeBase.myWebsite}
+
+            **Target Contact Information:**
+            - Contact Name: ${contact.contactName}
+            - Contact Title: ${contact.title}
+            - Organization: ${contact.organization}
+
+            **Intelligence Gathered on the Organization:**
+            - Mission: ${organizationIntel.mission}
+            - Vision: ${organizationIntel.vision}
+            - Strategic Goals: ${organizationIntel.goals.join(', ')}
+            - Recent News/Activity: ${organizationIntel.recentNews}
+            - Core Values: ${organizationIntel.values.join(', ')}
+
+            **Your Task:**
+            Generate the content for the following action: "${activeAction}"
+            The desired tone is: "${tone}"
+
+            **Instructions for "${activeAction}":**
+            `;
+
+            switch(activeAction) {
+                case 'Introductory Email':
+                    prompt += `
+                    - This is the first contact. The goal is to spark interest and secure a brief meeting.
+                    - Keep it concise and impactful.
+                    - Start with a personalized opening that connects my project to their mission, vision, or recent activity.
+                    - Briefly introduce my project, highlighting the single most relevant benefit to their organization based on their goals.
+                    - End with a clear, low-friction call to action (e.g., a 15-minute call).
+                    - Do not be overly salesy. Focus on synergy and mutual interest.
+                    - The output must be a valid JSON object with two keys: "subject" and "body". The body should be the full email text.`;
+                    break;
+                case 'Proposal':
+                    prompt += `
+                    - This is a formal proposal. It should be comprehensive, detailed, and professional.
+                    - Structure it with clear headings (e.g., Introduction, Understanding the Need, Proposed Solution, Alignment with Goals, Projected Impact, Partnership Framework, Next Steps).
+                    - Directly reference their mission, goals, and recent news to show this is a tailored, not generic, proposal.
+                    - Detail how my solution specifically addresses their needs and helps achieve their strategic objectives.
+                    - Use professional and persuasive language.
+                    - The output must be a valid JSON object with two keys: "subject" and "body". The body should be the full proposal text in Markdown format.`;
+                    break;
+                case 'Pitch Deck':
+                    prompt += `
+                    - This is an outline for a winning pitch deck. It should be concise, professional, and easy to consume.
+                    - Structure it as a series of slides (e.g., "Slide 1: Title", "Slide 2: The Problem/Opportunity", etc.).
+                    - For each slide, provide bullet points of the key content.
+                    - The narrative should flow logically, starting with their problem/opportunity (linked to their goals) and leading to my solution and a call to action.
+                    - The output must be a valid JSON object with two keys: "subject" and "body". The subject should be a title for the deck, and the body should be the full outline in Markdown format.`;
+                    break;
+                case 'Follow-up Email':
+                    prompt += `
+                    - This is a brief, friendly, and professional follow-up to a previous communication.
+                    - Keep it very short and to the point.
+                    - Gently remind them of the previous touchpoint and the core value proposition, possibly linking it to a recent piece of news from the intel.
+                    - The goal is to nudge them towards a response without being pushy.
+                    - End with a simple, easy-to-answer question.
+                    - The output must be a valid JSON object with two keys: "subject" and "body". The body should be the full email text.`;
+                    break;
+            }
+             prompt += `\nEnsure the final output is ONLY the raw JSON object, without any surrounding text or markdown formatting.`;
+
+            try {
+                const resultText = await callGemini(prompt);
+                const jsonStringMatch = resultText.match(/\{[\s\S]*\}/);
+                if (!jsonStringMatch) {
+                     throw new Error("Could not find a JSON object in the AI response.");
+                }
+                const parsedJson = JSON.parse(jsonStringMatch[0]);
+                
+                document.getElementById('contentSubject').value = parsedJson.subject;
+                document.getElementById('contentBody').value = parsedJson.body;
+                document.getElementById('generatedContent').classList.remove('hidden');
+            } catch (error) {
+                console.error("Content generation failed:", error);
+                showNotification("Failed to generate content. Please try again.", "error");
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = 'Generate Content';
+            }
+        }
+
+        function saveDraft() {
+            const contact = processedData.find(c => c.id === activeContactId);
+            if (!contact) return;
+
+            const subject = document.getElementById('contentSubject').value;
+            const body = document.getElementById('contentBody').value;
+
+            if (!contact.drafts) {
+                contact.drafts = [];
+            }
+
+            contact.drafts.push({
+                type: activeAction,
+                subject,
+                body,
+                date: new Date().toISOString()
+            });
+
+            showNotification('Draft saved successfully!', 'success');
+        }
+
+        function performAction() {
+            const contact = processedData.find(c => c.id === activeContactId);
+            if (!contact) return;
+
+            const subject = document.getElementById('contentSubject').value;
+            const body = document.getElementById('contentBody').value;
+
+            if (activeAction.toLowerCase().includes('email')) {
+                const encodedSubject = encodeURIComponent(subject);
+                const encodedBody = encodeURIComponent(body);
+                const mailtoLink = `mailto:${contact.email}?subject=${encodedSubject}&body=${encodedBody}`;
+                
+                window.location.href = mailtoLink;
+                
+                let newStatus = 'Follow-up Sent';
+                if (activeAction.includes('Intro')) newStatus = 'Intro Email Sent';
+                
+                contact.status = newStatus;
+                contact.lastContacted = new Date().toISOString().split('T')[0];
+                
+                renderTable();
+                updateDashboard();
+                aiComposerModal.style.display = 'none';
+                showNotification(`Your email client has been opened to send the ${activeAction}.`, 'success');
+
+            } else {
+                saveDraft();
+                aiComposerModal.style.display = 'none';
+                showNotification(`${activeAction} content saved as a draft.`, 'success');
+            }
+        }
+    </script>
+</body>
+</html>
