@@ -179,6 +179,8 @@
     </div>
 
     <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        
         // --- DATA ---
         const rawData = [
             {"category": "Kenyan Government Ministry", "name": "Ministry of Interior and National Administration", "telephone": ["+254-20-2227411"], "email": ["ps.interior@kenya.go.ke", "ps.pais@kenya.go.ke"]},
@@ -195,6 +197,7 @@
 
         // --- STATE & KNOWLEDGE BASE ---
         let processedData = [], filteredData = [], currentSort = { column: null, direction: 'asc' }, currentPage = 1, activeContactId = null, activeAction = '', organizationIntel = null;
+        let genAI;
         const rowsPerPage = 15;
         const statusOptions = ['Not Started', 'Intro Email Sent', 'Proposal Sent', 'Pitch Deck Sent', 'Follow-up Sent', 'Meeting Scheduled', 'Partnership Agreed', 'Not Interested', 'On Hold'];
         let userKnowledgeBase = {};
@@ -204,6 +207,8 @@
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
+            const API_KEY = ""; // Leave empty, will be handled by the environment
+            genAI = new GoogleGenerativeAI(API_KEY);
             loadKnowledgeBase();
             initializeData();
             initializeEventListeners();
@@ -481,87 +486,41 @@
             document.getElementById('userName').textContent = userKnowledgeBase.myName || 'User';
         }
 
-        // --- AI & API CALLS ---
-        async function callGemini(prompt) {
-            // The API URL now points to our own serverless function proxy
-            const apiUrl = `/.netlify/functions/gemini-proxy`;
-            
-            const payload = { prompt }; // Send the prompt in the request body
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                console.error("Proxy function error response:", errorBody);
-                throw new Error(`Proxy function call failed with status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            
-            // Handle potential errors returned from the proxy function itself
-            if (result.error) {
-                 throw new Error(`Error from proxy function: ${result.error}`);
-            }
-
-            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
-                return result.candidates[0].content.parts[0].text;
-            } else {
-                console.error("Invalid response structure from proxy:", result);
-                throw new Error("Invalid response structure from proxy");
-            }
-        }
-
         // --- AI COMPOSER & INTEL GATHERING ---
         async function gatherAndDisplayIntel() {
             const contact = processedData.find(c => c.id === activeContactId);
             const intelDisplay = document.getElementById('intelDisplay');
             const intelLoader = document.getElementById('intelLoader');
-
+            
             intelLoader.style.display = 'block';
             intelDisplay.classList.add('hidden');
-            document.getElementById('composerControls').classList.add('hidden');
-
-            const prompt = `
-                You are an expert research analyst with access to real-time web search capabilities. Your task is to provide a concise intelligence briefing on the following organization. Use your internal knowledge and simulated web search to find the most accurate, factual, and up-to-date information. Do not invent information. If you cannot find specific details, state "Information not publicly available".
-
-                **Target Organization:** ${contact.organization}
-                **Target Contact (for context):** ${contact.contactName}, ${contact.title}
-
-                **Required Information:**
-                1.  **Mission:** What is the organization's core purpose or mission statement?
-                2.  **Vision:** What is the organization's forward-looking vision statement?
-                3.  **Goals:** What are their key publicly stated strategic goals, desires, aspirations, or current objectives? (Provide as a list)
-                4.  **Recent News:** What are their most significant recent announcements, projects, or news from the last 6-12 months?
-                5.  **Values:** What are the organization's stated core values or cultural pillars? (Provide as a list)
-
-                Please format your response as a single, valid JSON object with the following keys: "mission", "vision", "goals" (as an array of strings), "recentNews", and "values" (as an array of strings).
-            `;
-
+            
             try {
-                const resultText = await callGemini(prompt);
-                const jsonStringMatch = resultText.match(/```json\s*([\s\S]*?)\s*```/s);
-                if (!jsonStringMatch) {
-                    throw new Error("Could not find a JSON block in the AI response.");
+                // This now calls your Netlify function endpoint
+                const response = await fetch('/.netlify/functions/gather-intel', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        orgName: contact.organization, 
+                        website: contact.website,
+                        linkedin: contact.linkedin,
+                        facebook: contact.facebook,
+                        twitter: contact.twitter
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Netlify function failed with status: ${response.status}`);
                 }
-                organizationIntel = JSON.parse(jsonStringMatch[1]);
 
-                const formatArray = (data) => Array.isArray(data) ? data : (data ? [data] : ['Not found']);
-                const goalsList = formatArray(organizationIntel.goals).map(g => `<li>${g}</li>`).join('') || '<li>Not found</li>';
-                const valuesList = formatArray(organizationIntel.values).map(v => `<li>${v}</li>`).join('') || '<li>Not found</li>';
-
+                organizationIntel = await response.json();
+                
                 intelDisplay.innerHTML = `
                     <h4 class="font-semibold text-gray-800">Key Intel for ${contact.organization}:</h4>
-                    <div class="mt-2 space-y-2 text-sm text-gray-700">
-                        <p><strong>Mission:</strong> ${organizationIntel.mission || 'Not found'}</p>
-                        <p><strong>Vision:</strong> ${organizationIntel.vision || 'Not found'}</p>
-                        <div><strong>Strategic Goals:</strong> <ul class="list-disc list-inside mt-1">${goalsList}</ul></div>
-                        <p><strong>Recent Activity:</strong> ${organizationIntel.recentNews || 'Not found'}</p>
-                        <div><strong>Values:</strong> <ul class="list-disc list-inside mt-1">${valuesList}</ul></div>
-                    </div>
+                    <ul class="list-disc list-inside text-sm text-gray-700 mt-2 space-y-1">
+                        <li><strong>Mission:</strong> ${organizationIntel.mission}</li>
+                        <li><strong>Strategic Goals:</strong> ${Array.isArray(organizationIntel.goals) ? organizationIntel.goals.join(', ') : organizationIntel.goals}</li>
+                        <li><strong>Recent Activity:</strong> ${organizationIntel.recentNews}</li>
+                    </ul>
                 `;
                 document.getElementById('composerControls').classList.remove('hidden');
             } catch (error) {
@@ -593,47 +552,42 @@
             aiComposerModal.style.display = 'block';
         };
 
-        async function generateContent() {
-            const contact = processedData.find(c => c.id === activeContactId);
-            const tone = document.getElementById('composerTone').value;
-            
-            const generateBtn = document.getElementById('generateContentBtn');
-            generateBtn.disabled = true;
-            generateBtn.innerHTML = 'Generating...';
+        async function getAIResponse(contact, action, kb, intel, tone) {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
 
             let prompt = `Act as a professional outreach strategist. Your task is to generate content for a specific outreach action. Critically analyze all the provided information to create a winning, unique, and highly tailored piece of content.
 
             **My Information (from Knowledge Base):**
-            - My Name: ${userKnowledgeBase.myName}
-            - My Role: ${userKnowledgeBase.myRole}
-            - My Project/Solution: ${userKnowledgeBase.solutionDetails}
-            - My Website: ${userKnowledgeBase.myWebsite}
+            - My Name: ${kb.myName}
+            - My Role: ${kb.myRole}
+            - My Project/Solution: ${kb.solutionDetails}
+            - My Website: ${kb.myWebsite}
 
             **Target Contact Information:**
             - Contact Name: ${contact.contactName}
             - Contact Title: ${contact.title}
             - Organization: ${contact.organization}
+            - Website: ${contact.website || 'Not provided'}
+            - LinkedIn: ${contact.linkedin || 'Not provided'}
 
             **Intelligence Gathered on the Organization:**
-            - Mission: ${organizationIntel.mission}
-            - Vision: ${organizationIntel.vision}
-            - Strategic Goals: ${organizationIntel.goals.join(', ')}
-            - Recent News/Activity: ${organizationIntel.recentNews}
-            - Core Values: ${organizationIntel.values.join(', ')}
+            - Mission: ${intel.mission}
+            - Strategic Goals: ${intel.goals.join(', ')}
+            - Recent News/Activity: ${intel.recentNews}
 
             **Your Task:**
-            Generate the content for the following action: "${activeAction}"
+            Generate the content for the following action: "${action}"
             The desired tone is: "${tone}"
 
-            **Instructions for "${activeAction}":**
+            **Instructions for "${action}":**
             `;
 
-            switch(activeAction) {
+            switch(action) {
                 case 'Introductory Email':
                     prompt += `
                     - This is the first contact. The goal is to spark interest and secure a brief meeting.
                     - Keep it concise and impactful.
-                    - Start with a personalized opening that connects my project to their mission, vision, or recent activity.
+                    - Start with a personalized opening that connects my project to their mission or recent activity.
                     - Briefly introduce my project, highlighting the single most relevant benefit to their organization based on their goals.
                     - End with a clear, low-friction call to action (e.g., a 15-minute call).
                     - Do not be overly salesy. Focus on synergy and mutual interest.
@@ -642,42 +596,67 @@
                 case 'Proposal':
                     prompt += `
                     - This is a formal proposal. It should be comprehensive, detailed, and professional.
-                    - Structure it with clear headings (e.g., Introduction, Understanding the Need, Proposed Solution, Alignment with Goals, Projected Impact, Partnership Framework, Next Steps).
+                    - Structure it with clear headings (e.g., Introduction, Understanding the Need, Proposed Solution, Projected Impact, Partnership Framework, Next Steps).
                     - Directly reference their mission, goals, and recent news to show this is a tailored, not generic, proposal.
                     - Detail how my solution specifically addresses their needs and helps achieve their strategic objectives.
                     - Use professional and persuasive language.
+                    - Include placeholders for graphical elements like charts or tables where appropriate (e.g., "[Chart: Projected Impact...]" or "[Table: Feature Comparison]").
                     - The output must be a valid JSON object with two keys: "subject" and "body". The body should be the full proposal text in Markdown format.`;
                     break;
                 case 'Pitch Deck':
                     prompt += `
                     - This is an outline for a winning pitch deck. It should be concise, professional, and easy to consume.
-                    - Structure it as a series of slides (e.g., "Slide 1: Title", "Slide 2: The Problem/Opportunity", etc.).
+                    - Structure it as a series of slides (e.g., "Slide 1: Title", "Slide 2: The Problem", etc.).
                     - For each slide, provide bullet points of the key content.
-                    - The narrative should flow logically, starting with their problem/opportunity (linked to their goals) and leading to my solution and a call to action.
+                    - The narrative should flow logically, starting with their problem/opportunity and leading to my solution and a call to action.
+                    - Make it relatable by using their own mission and goals in the narrative.
                     - The output must be a valid JSON object with two keys: "subject" and "body". The subject should be a title for the deck, and the body should be the full outline in Markdown format.`;
                     break;
                 case 'Follow-up Email':
                     prompt += `
                     - This is a brief, friendly, and professional follow-up to a previous communication.
                     - Keep it very short and to the point.
-                    - Gently remind them of the previous touchpoint and the core value proposition, possibly linking it to a recent piece of news from the intel.
+                    - Gently remind them of the previous touchpoint and the core value proposition.
                     - The goal is to nudge them towards a response without being pushy.
                     - End with a simple, easy-to-answer question.
                     - The output must be a valid JSON object with two keys: "subject" and "body". The body should be the full email text.`;
                     break;
+                default:
+                    return { subject: "Error", body: "Invalid action selected." };
             }
-             prompt += `\nEnsure the final output is ONLY the raw JSON object, without any surrounding text or markdown formatting.`;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+            
+            try {
+                const jsonString = text.match(/```json\s*([\s\S]*?)\s*```/)[1];
+                const parsedJson = JSON.parse(jsonString);
+                return { subject: parsedJson.subject, body: parsedJson.body };
+            } catch (e) {
+                console.error("Failed to parse JSON from model response:", text, e);
+                // Fallback for when the model doesn't return perfect JSON
+                const subjectMatch = text.match(/subject":\s*"(.*?)"/);
+                const bodyMatch = text.match(/body":\s*"([\s\S]*)"/);
+                const subject = subjectMatch ? subjectMatch[1] : `Content for ${action}`;
+                const body = bodyMatch ? bodyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : text;
+                return { subject, body };
+            }
+        }
+
+        async function generateContent() {
+            const contact = processedData.find(c => c.id === activeContactId);
+            const tone = document.getElementById('composerTone').value;
+            
+            const generateBtn = document.getElementById('generateContentBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = 'Generating...';
 
             try {
-                const resultText = await callGemini(prompt);
-                const jsonStringMatch = resultText.match(/\{[\s\S]*\}/);
-                if (!jsonStringMatch) {
-                     throw new Error("Could not find a JSON object in the AI response.");
-                }
-                const parsedJson = JSON.parse(jsonStringMatch[0]);
+                const { subject, body } = await getAIResponse(contact, activeAction, userKnowledgeBase, organizationIntel, tone);
                 
-                document.getElementById('contentSubject').value = parsedJson.subject;
-                document.getElementById('contentBody').value = parsedJson.body;
+                document.getElementById('contentSubject').value = subject;
+                document.getElementById('contentBody').value = body;
                 document.getElementById('generatedContent').classList.remove('hidden');
             } catch (error) {
                 console.error("Content generation failed:", error);
